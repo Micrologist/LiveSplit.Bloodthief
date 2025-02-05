@@ -137,7 +137,7 @@ init
 update
 {
     vars.Watchers.UpdateAll(game);
-    current.igt = (vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3; // deobfuscating the timer
+    current.igt = (vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3; // nothing to see here, folks!
     current.checkpointNum = vars.Watchers["current_checkpoint"].Current;
     current.levelFinished = vars.Watchers["level_end_screen_visible"].Current;
 
