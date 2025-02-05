@@ -179,3 +179,8 @@ start
     return (current.igt > 0 && old.igt <= 0)
         && !current.inMainMenu;
 }
+
+reset
+{
+    return current.igt < old.igt - 0.1;
+}
