@@ -123,7 +123,7 @@ init
         //GameManager.total_game_seconds
         new MemoryWatcher<double>(new DeepPointer(gameManagerMemberArray + 0xE0)) { Name = "total_game_seconds"},
         //GameManager.current_checkpoint
-        new MemoryWatcher<int>(new DeepPointer(gameManagerMemberArray + 0x2603)) { Name = "current_checkpoint"},
+        new MemoryWatcher<int>(new DeepPointer(gameManagerMemberArray + 0x260)) { Name = "current_checkpoint"},
         //GameManager.player
         new MemoryWatcher<IntPtr>(new DeepPointer(gameManagerMemberArray + 0x28)) { Name = "player"},
 
@@ -155,7 +155,6 @@ update
         current.speed = Math.Sqrt((xVel * xVel) + (zVel * zVel));
         vars.UpdateSpeedometer(current.speed);
     }
-    
 }
 
 isLoading
