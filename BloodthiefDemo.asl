@@ -37,13 +37,14 @@ startup
         }
     }
 
-    settings.Add("speedometer", true, "Show speed readout");
-    settings.Add("checkpointSplit", true, "Split when reaching a checkpoint");
+    settings.Add("speedometer", false, "Show speed readout");
+    settings.Add("checkpointSplit", false, "Split when reaching a checkpoint");
 }
 
 init
 {
     vars.SceneTree = vars.GameManager = vars.EndLevelScreen = IntPtr.Zero;
+    vars.accIgt = 0;
     current.igt = old.igt = -1;
     current.checkpointNum = old.checkpointNum = 0;
     current.scene = old.scene = "MainScreen";
@@ -138,6 +139,12 @@ update
 {
     vars.Watchers.UpdateAll(game);
     current.igt = (vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3; // nothing to see here, folks!
+
+    if(current.igt < old.igt)
+    {
+        vars.accIgt += old.igt;
+    }
+
     current.checkpointNum = vars.Watchers["current_checkpoint"].Current;
     current.levelFinished = vars.Watchers["level_end_screen_visible"].Current;
 
@@ -164,7 +171,7 @@ isLoading
 
 gameTime
 {
-    return TimeSpan.FromSeconds(current.igt);
+    return TimeSpan.FromSeconds(vars.accIgt + current.igt);
 }
 
 split
@@ -179,7 +186,7 @@ start
         && !current.inMainMenu;
 }
 
-reset
+onStart
 {
-    return current.igt < old.igt - 0.1;
+    vars.accIgt = 0f;
 }
