@@ -211,3 +211,8 @@ reset
         old.scene == "MainScreen"
     );
 }
+
+exit
+{
+    timer.IsGameTimePaused = true;
+}
