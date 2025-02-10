@@ -37,8 +37,10 @@ startup
         }
     }
 
-    settings.Add("speedometer", false, "Show speed readout");
+    settings.Add("endlevelSplit", true, "Split when finishing a level");
     settings.Add("checkpointSplit", false, "Split when reaching a checkpoint");
+    settings.Add("ilMode", false, "Reset timer when restarting a level (IL Mode)");
+    settings.Add("speedometer", false, "Show speed readout");
 }
 
 init
@@ -138,12 +140,6 @@ init
 update
 {
     vars.Watchers.UpdateAll(game);
-    current.igt = (vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3; // nothing to see here, folks!
-
-    if(current.igt < old.igt)
-    {
-        vars.accIgt += old.igt;
-    }
 
     current.checkpointNum = vars.Watchers["current_checkpoint"].Current;
     current.levelFinished = vars.Watchers["level_end_screen_visible"].Current;
@@ -153,7 +149,15 @@ update
     var newScene = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)currentSceneNode + 0x218));
     current.scene = String.IsNullOrEmpty(newScene) ? old.scene : newScene;
     current.inMainMenu = current.scene == "MainScreen";
-    
+
+    current.igt = current.inMainMenu ? 0f : ((vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3);
+
+    if(!settings["ilMode"] && current.igt < old.igt && old.scene != "MainScreen")
+    {
+        vars.accIgt += old.igt;
+        vars.Log("Accumulated "+old.igt.ToString("0.00")+" seconds of igt on "+old.scene);
+    }
+
     if(settings["speedometer"])
     {
         var player = (IntPtr)vars.Watchers["player"].Current;
@@ -177,7 +181,7 @@ gameTime
 split
 {
     return (settings["checkpointSplit"] && current.checkpointNum > old.checkpointNum)
-        || (current.levelFinished && !old.levelFinished);
+        || (settings["endlevelSplit"] && current.levelFinished && !old.levelFinished);
 }
 
 start
@@ -189,4 +193,10 @@ start
 onStart
 {
     vars.accIgt = 0f;
+}
+
+reset
+{
+    return (settings["ilMode"] && current.igt < old.igt - 0.1)
+    || (old.scene == "MainScreen" && current.scene == "JakePractice2");
 }
