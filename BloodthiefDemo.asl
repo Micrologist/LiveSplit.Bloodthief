@@ -39,7 +39,8 @@ startup
 
     settings.Add("endlevelSplit", true, "Split when finishing a level");
     settings.Add("checkpointSplit", false, "Split when reaching a checkpoint");
-    settings.Add("ilMode", false, "Reset timer when restarting a level (IL Mode)");
+    settings.Add("levelOneReset", true, "Reset timer when restarting level 1");
+    settings.Add("ilMode", false, "Reset timer when restarting any level (IL Mode)");
     settings.Add("speedometer", false, "Show speed readout");
 }
 
@@ -197,6 +198,16 @@ onStart
 
 reset
 {
-    return (settings["ilMode"] && current.igt < old.igt - 0.1)
-    || (old.scene == "MainScreen" && current.scene == "JakePractice2");
+    return (
+        (current.igt < old.igt && !current.inMainMenu) && (
+            settings["ilMode"] || 
+            (settings["levelOneReset"] && 
+            current.scene == "JakePractice2" && 
+            !old.levelFinished)
+        )
+    ) || (
+        settings["levelOneReset"] && 
+        current.scene == "JakePractice2" && 
+        old.scene == "MainScreen"
+    );
 }
