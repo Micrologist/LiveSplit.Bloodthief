@@ -152,6 +152,7 @@ update
     current.inMainMenu = current.scene == "MainScreen";
 
     current.igt = current.inMainMenu ? 0f : ((vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3);
+    current.igt = Math.Floor(current.igt * 1000) / 1000;
 
     if(!settings["ilMode"] && current.igt < old.igt && old.scene != "MainScreen")
     {
