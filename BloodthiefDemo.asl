@@ -48,6 +48,7 @@ init
 {
     vars.SceneTree = vars.GameManager = vars.EndLevelScreen = IntPtr.Zero;
     vars.accIgt = 0;
+    vars.levelOneCompleted = false;
     current.igt = old.igt = -1;
     current.checkpointNum = old.checkpointNum = 0;
     current.scene = old.scene = "MainScreen";
@@ -154,6 +155,11 @@ update
     current.igt = current.inMainMenu ? 0f : ((vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3);
     current.igt = Math.Floor(current.igt * 1000) / 1000;
 
+    if(current.levelFinished && current.scene == "JakePractice2")
+    {
+        vars.levelOneCompleted = true;
+    }
+
     if(!settings["ilMode"] && current.igt < old.igt && old.scene != "MainScreen")
     {
         vars.accIgt += old.igt;
@@ -195,6 +201,7 @@ start
 onStart
 {
     vars.accIgt = 0f;
+    vars.levelOneCompleted = false;
 }
 
 reset
@@ -202,9 +209,10 @@ reset
     return (
         (current.igt < old.igt && !current.inMainMenu) && (
             settings["ilMode"] || 
-            (settings["levelOneReset"] && 
+            (settings["levelOneReset"] &&
+            !vars.levelOneCompleted &&
             current.scene == "JakePractice2" && 
-            !old.levelFinished)
+            !old.levelFinished && !current.levelFinished)
         )
     ) || (
         settings["levelOneReset"] && 
