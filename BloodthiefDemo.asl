@@ -47,8 +47,8 @@ startup
 init
 {
     vars.SceneTree = vars.GameManager = vars.EndLevelScreen = IntPtr.Zero;
-    vars.accIgt = 0;
-    vars.levelOneCompleted = false;
+    vars.AccIgt = 0;
+    vars.LevelOneCompleted = false;
     current.igt = old.igt = -1;
     current.checkpointNum = old.checkpointNum = 0;
     current.scene = old.scene = "MainScreen";
@@ -69,35 +69,59 @@ init
         return output;
     });
 
+    //Godot 4.4 offsets
+    vars.ROOT_WINDOW_OFFSET = 0x3A8;
+    vars.CHILD_ARRAY_OFFSET = 0x1C8;
+    vars.NODE_NAME_OFFSET = 0x228;
+    vars.CL_VISIBLE_OFFSET = 0x454;
+    vars.CURRENT_SCENE_OFFSET = 0x498;
+    vars.PLAYER_VEL_OFFSET = 0x648;
+
     //Our "entry" into the hierarchy is Godot's SceneTree object. See https://docs.godotengine.org/en/stable/classes/class_scenetree.html#class-scenetree
     //We are scanning for a piece of code that accesses the static pointer to the singleton instance of SceneTree
     //--- bloodthief_v0.01.exe+3F01F8 - 4C 8B 35 F1C3FA02     - mov r14,[bloodthief_v0.01.exe+339C5F0]
     //"4C 8B 35 ?? ?? ?? ?? 4D 85 F6 74 7E E8 ?? ?? ?? ?? 49 8B CE 48 8B F0 48 8B 10 48 8B BA"
     var scn = new SignatureScanner(game, game.MainModule.BaseAddress, game.MainModule.ModuleMemorySize);
-    var sceneTreeTrg = new SigScanTarget(3, "4C 8B 35 ?? ?? ?? ?? 4D 85 F6 74") { OnFound = (p, s, ptr) => ptr + 0x4 + game.ReadValue<int>(ptr) };
+    var sceneTreeTrg = new SigScanTarget(3, "4C 8B 35 ?? ?? ?? ?? 4D 85 F6 74 7E") { OnFound = (p, s, ptr) => ptr + 0x4 + game.ReadValue<int>(ptr) };
     var sceneTreePtr = scn.Scan(sceneTreeTrg);
 
     if(sceneTreePtr == IntPtr.Zero)
     {
-        throw new Exception("SceneTree not found - trying again!");
+        //Check if the 4.3 signature works instead
+        sceneTreeTrg = new SigScanTarget(3, "4C 8B 35 ?? ?? ?? ?? 4D 85 F6 74") { OnFound = (p, s, ptr) => ptr + 0x4 + game.ReadValue<int>(ptr) };
+        sceneTreePtr = scn.Scan(sceneTreeTrg);
+        if(sceneTreePtr == IntPtr.Zero)
+        {
+            throw new Exception("SceneTree not found - trying again!");
+        }
+        else
+        {
+            //Godot 4.3 offsets
+            vars.ROOT_WINDOW_OFFSET = 0x348;
+            vars.CHILD_ARRAY_OFFSET = 0x1B8;
+            vars.NODE_NAME_OFFSET = 0x218;
+            vars.CL_VISIBLE_OFFSET = 0x444;
+            vars.CURRENT_SCENE_OFFSET = 0x438;
+            vars.PLAYER_VEL_OFFSET = 0x618;
+        }
     }
 
     //Follow the pointer
     vars.SceneTree = game.ReadValue<IntPtr>((IntPtr)sceneTreePtr); 
 
     //SceneTree.root
-    var rootWindow = game.ReadValue<IntPtr>((IntPtr)vars.SceneTree+0x348);
+    var rootWindow = game.ReadValue<IntPtr>((IntPtr)(vars.SceneTree + vars.ROOT_WINDOW_OFFSET));
 
     //We are starting from the rootwindow node, its children are the scene root nodes
-    var childCount = game.ReadValue<int>((IntPtr)rootWindow + 0x1B8);
-    var childArrayPtr = game.ReadValue<IntPtr>((IntPtr)rootWindow + 0x1C0);
+    var childCount = game.ReadValue<int>((IntPtr)(rootWindow + vars.CHILD_ARRAY_OFFSET));
+    var childArrayPtr = game.ReadValue<IntPtr>((IntPtr)(rootWindow + vars.CHILD_ARRAY_OFFSET + 0x8));
 
     //Iterating through all scene root nodes to find the GameManager and EndLevelScreen nodes
     //Caching here only works because the nodes aren't ever destroyed/created at runtime
     for (int i = 0; i < childCount; i++)
     {
         var child = game.ReadValue<IntPtr>(childArrayPtr + (0x8 * i));
-        var childName = vars.ReadStringName(game.ReadValue<IntPtr>(child + 0x218));
+        var childName = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(child + vars.NODE_NAME_OFFSET)));
 
         if(childName == "GameManager")
         {
@@ -133,10 +157,8 @@ init
         new MemoryWatcher<IntPtr>(new DeepPointer(gameManagerMemberArray + 0x28)) { Name = "player"},
 
         //EndLevelScreen.visible (EndLevelScreen is a CanvasLayer Node)
-        new MemoryWatcher<bool>(new DeepPointer(vars.EndLevelScreen + 0x444)) { Name = "level_end_screen_visible"}
+        new MemoryWatcher<bool>(new DeepPointer(vars.EndLevelScreen + vars.CL_VISIBLE_OFFSET)) { Name = "level_end_screen_visible"}
     };
-
-    vars.Log("gameManagerMemberArray at 0x"+gameManagerMemberArray.ToString("X16"));
 }
 
 update
@@ -147,8 +169,8 @@ update
     current.levelFinished = vars.Watchers["level_end_screen_visible"].Current;
 
     //SceneTree.current_scene
-    var currentSceneNode = game.ReadValue<IntPtr>((IntPtr)vars.SceneTree + 0x438);
-    var newScene = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)currentSceneNode + 0x218));
+    var currentSceneNode = game.ReadValue<IntPtr>((IntPtr)(vars.SceneTree + vars.CURRENT_SCENE_OFFSET));
+    var newScene = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(currentSceneNode + vars.NODE_NAME_OFFSET)));
     current.scene = String.IsNullOrEmpty(newScene) ? old.scene : newScene;
     current.inMainMenu = current.scene == "MainScreen";
 
@@ -157,20 +179,20 @@ update
 
     if(current.levelFinished && current.scene == "JakePractice2")
     {
-        vars.levelOneCompleted = true;
+        vars.LevelOneCompleted = true;
     }
 
     if(!settings["ilMode"] && current.igt < old.igt && old.scene != "MainScreen")
     {
-        vars.accIgt += old.igt;
+        vars.AccIgt += old.igt;
         vars.Log("Accumulated "+old.igt.ToString("0.00")+" seconds of igt on "+old.scene);
     }
 
     if(settings["speedometer"])
     {
         var player = (IntPtr)vars.Watchers["player"].Current;
-        var xVel = game.ReadValue<float>(player + 0x618);
-        var zVel = game.ReadValue<float>(player + 0x620);
+        var xVel = game.ReadValue<float>((IntPtr)(player + vars.PLAYER_VEL_OFFSET));
+        var zVel = game.ReadValue<float>((IntPtr)(player + vars.PLAYER_VEL_OFFSET + 0x8));
         current.speed = Math.Sqrt((xVel * xVel) + (zVel * zVel));
         vars.UpdateSpeedometer(current.speed);
     }
@@ -183,7 +205,7 @@ isLoading
 
 gameTime
 {
-    return TimeSpan.FromSeconds(vars.accIgt + current.igt);
+    return TimeSpan.FromSeconds(vars.AccIgt + current.igt);
 }
 
 split
@@ -200,8 +222,8 @@ start
 
 onStart
 {
-    vars.accIgt = 0f;
-    vars.levelOneCompleted = false;
+    vars.AccIgt = 0f;
+    vars.LevelOneCompleted = false;
 }
 
 reset
@@ -210,7 +232,7 @@ reset
         (current.igt < old.igt && !current.inMainMenu) && (
             settings["ilMode"] || 
             (settings["levelOneReset"] &&
-            !vars.levelOneCompleted &&
+            !vars.LevelOneCompleted &&
             current.scene == "JakePractice2" && 
             !old.levelFinished && !current.levelFinished)
         )
