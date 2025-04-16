@@ -44,7 +44,7 @@ startup
     settings.Add("checkpointSplit", false, "Split when reaching a checkpoint");
     settings.Add("ilMode", false, "Always reset when restarting level (IL Mode)");
     settings.Add("aprilComp", true, "Subtract 0.9 seconds for every kill (April Competition)"); 
-    settings.Add("enemyCounter", false, "Show enemy count", "aprilComp");
+    settings.Add("enemyCounter", false, "Show enemy kill counter", "aprilComp");
     settings.Add("speedometer", false, "Show speed readout");
 }
 
