@@ -94,23 +94,7 @@ init
 
     if(sceneTreePtr == IntPtr.Zero)
     {
-        //Check if the 4.3 signature works instead
-        sceneTreeTrg = new SigScanTarget(3, "4C 8B 35 ?? ?? ?? ?? 4D 85 F6 74") { OnFound = (p, s, ptr) => ptr + 0x4 + game.ReadValue<int>(ptr) };
-        sceneTreePtr = scn.Scan(sceneTreeTrg);
-        if(sceneTreePtr == IntPtr.Zero)
-        {
-            throw new Exception("SceneTree not found - trying again!");
-        }
-        else
-        {
-            //Godot 4.3 offsets
-            vars.ROOT_WINDOW_OFFSET = 0x348;
-            vars.CHILD_ARRAY_OFFSET = 0x1B8;
-            vars.NODE_NAME_OFFSET = 0x218;
-            vars.CL_VISIBLE_OFFSET = 0x444;
-            vars.CURRENT_SCENE_OFFSET = 0x438;
-            vars.PLAYER_VEL_OFFSET = 0x618;
-        }
+        throw new Exception("SceneTree not found - trying again!");
     }
 
     //Follow the pointer
