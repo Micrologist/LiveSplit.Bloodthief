@@ -90,10 +90,10 @@ init
     var sceneTreePtr = scn.Scan(sceneTreeTrg);
 
     // Iterate through the scene root nodes to find the nodes we need
-    var sceneTree       = game.ReadValue<IntPtr>((IntPtr)sceneTreePtr);
-    var rootWindow      = game.ReadValue<IntPtr>((IntPtr)(sceneTree + vars.SCENETREE_ROOT_WINDOW_OFFSET));
-    var childCount      = game.ReadValue<int>((IntPtr)(rootWindow + vars.NODE_CHILDREN_OFFSET));
-    var childArrayPtr   = game.ReadValue<IntPtr>((IntPtr)(rootWindow + vars.NODE_CHILDREN_OFFSET + 0x8));
+    var sceneTree      = game.ReadValue<IntPtr>((IntPtr)(sceneTreePtr));
+    var rootWindow     = game.ReadValue<IntPtr>((IntPtr)(sceneTree  + vars.SCENETREE_ROOT_WINDOW_OFFSET));
+    var childCount     = game.ReadValue<int>   ((IntPtr)(rootWindow + vars.NODE_CHILDREN_OFFSET));
+    var childArrayPtr  = game.ReadValue<IntPtr>((IntPtr)(rootWindow + vars.NODE_CHILDREN_OFFSET + 0x8));
 
     var gameManager     = IntPtr.Zero;
     var statsService    = IntPtr.Zero;
