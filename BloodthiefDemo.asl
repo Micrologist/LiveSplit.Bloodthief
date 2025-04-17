@@ -50,9 +50,11 @@ startup
     vars.NODE_CHILDREN_OFFSET                = 0x01C8; // HashMap<StringName, Node*>        Node::Data::children
     vars.NODE_NAME_OFFSET                    = 0x0228; // StringName                        Node::Data::name
 
-    // ScriptInstance / GDScript
+    // GDScriptInstance
     vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET    = 0x0018; // Ref<GDScript>                     GDScriptInstance::script
     vars.SCRIPTINSTANCE_MEMBERS_OFFSET       = 0x0028; // Vector<Variant>                   GDScriptInstance::members
+
+    // GDScript
     vars.GDSCRIPT_MEMBER_MAP_OFFSET          = 0x0258; // HashMap<StringName, MemberInfo>   GDScript::member_indices
 
     // CanvasLayer
