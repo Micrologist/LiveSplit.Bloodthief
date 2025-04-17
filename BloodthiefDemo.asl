@@ -180,25 +180,29 @@ init
         new MemoryWatcher<IntPtr> (new DeepPointer(sceneTree      + vars.SCENETREE_CURRENT_SCENE_OFFSET))         { Name = "current_scene"},
     };
 
-    vars.Watchers.UpdateAll(game);
+    vars.UpdateState = (Action)(()=> 
+    {
+        vars.Watchers.UpdateAll(game);
+        current.checkpointNum = vars.Watchers["current_checkpoint"].Current;
+        current.levelFinished = vars.Watchers["level_end_screen_visible"].Current;
+        current.levelWasRestarted = vars.Watchers["locked_keys_dict"].Current != vars.Watchers["locked_keys_dict"].Old;
+
+        var currentSceneNode = vars.Watchers["current_scene"].Current;
+        var newScene = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(currentSceneNode + vars.NODE_NAME_OFFSET)));
+        current.scene = String.IsNullOrEmpty(newScene) ? old.scene : newScene;
+
+        current.inMainMenu = current.scene == "MainScreen";
+
+        current.igt = current.inMainMenu ? 0f : ((vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3);
+        current.igt = Math.Floor(current.igt * 1000) / 1000;
+    });
+
+    vars.UpdateState();
 }
 
 update
 {
-    vars.Watchers.UpdateAll(game);
-
-    current.checkpointNum      = vars.Watchers["current_checkpoint"].Current;
-    current.levelFinished      = vars.Watchers["level_end_screen_visible"].Current;
-    current.levelWasRestarted  = vars.Watchers["locked_keys_dict"].Current != vars.Watchers["locked_keys_dict"].Old;
-
-    var currentSceneNode = vars.Watchers["current_scene"].Current;
-    var newScene = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(currentSceneNode + vars.NODE_NAME_OFFSET)));
-    current.scene = String.IsNullOrEmpty(newScene) ? old.scene : newScene;
-
-    current.inMainMenu = current.scene == "MainScreen";
-
-    current.igt = current.inMainMenu ? 0f : ((vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3);
-    current.igt = Math.Floor(current.igt * 1000) / 1000;
+    vars.UpdateState();
 
     // Once a level is completed, auto-reset is disabled and IGT is accumulated
     if(current.levelFinished && !vars.OneLevelCompleted)
@@ -257,7 +261,6 @@ update
         }
     }
 }
-
 
 isLoading
 {
