@@ -33,12 +33,12 @@ startup
         }
     }
 
-    settings.Add("endlevelSplit", true, "Split when finishing a level");
+    settings.Add("endlevelSplit",   true,  "Split when finishing a level");
     settings.Add("checkpointSplit", false, "Split when reaching a checkpoint");
-    settings.Add("ilMode", false, "Always reset when restarting level (IL Mode)");
-    settings.Add("aprilComp", true, "Subtract 0.9 seconds for every kill (April Competition)"); 
-    settings.Add("enemyCounter", false, "Show enemy kill counter", "aprilComp");
-    settings.Add("speedometer", false, "Show speed readout");
+    settings.Add("ilMode",          false, "Always reset when restarting level (IL Mode)");
+    settings.Add("aprilComp",       true,  "Subtract 0.9 seconds for every kill (April Competition)"); 
+    settings.Add("enemyCounter",    false, "Show enemy kill counter", "aprilComp");
+    settings.Add("speedometer",     false, "Show speed readout");
 
     // Godot 4.4 Offsets
     // SceneTree
@@ -68,21 +68,21 @@ init
     vars.OneLevelCompleted = false;
     vars.killsAtCompletion = 0;
     
-    current.igt = old.igt = -1;
-    current.checkpointNum = old.checkpointNum = 0;
-    current.scene = old.scene = "MainScreen";
-    current.levelFinished = old.levelFinished = false;
-    current.levelWasRestarted = old.levelWasRestarted = false;
-    current.killCount = old.killCount = 0;
+    current.igt                 = old.igt                   = -1;
+    current.checkpointNum       = old.checkpointNum         = 0;
+    current.scene               = old.scene                 = "MainScreen";
+    current.levelFinished       = old.levelFinished         = false;
+    current.levelWasRestarted   = old.levelWasRestarted     = false;
+    current.killCount           = old.killCount             = 0;
 
     // todo: properly read stringnames
     vars.ReadStringName = (Func<IntPtr, string>) ((ptr) => {
-        var output = "";
+        var output  = "";
         var charPtr = game.ReadValue<IntPtr>((IntPtr)ptr + 0x10);
         
         while(game.ReadValue<int>((IntPtr)charPtr) != 0)
         {
-            output += game.ReadValue<char>(charPtr);
+            output  += game.ReadValue<char>(charPtr);
             charPtr += 0x4;
         }
         
@@ -108,6 +108,7 @@ init
     {
         var child = game.ReadValue<IntPtr>(childArrayPtr + (0x8 * i));
         var childName = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(child + vars.NODE_NAME_OFFSET)));
+
         if(childName == "GameManager")         
             gameManager = child;
         else if(childName == "StatsService")   
@@ -119,8 +120,8 @@ init
     if(sceneTree == IntPtr.Zero || gameManager == IntPtr.Zero || endLevelScreen == IntPtr.Zero || statsService == IntPtr.Zero)
         throw new Exception("SceneTree/GameManager/EndLevelScreen/StatsService not found - trying again!");
 
-    gameManager    = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
-    statsService   = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
+    gameManager  = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
+    statsService = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
 
     var gameManagerScript  = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
     var statsServiceScript = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
@@ -131,7 +132,7 @@ init
         var result = new Dictionary<string, int>();
         var memberPtr     = game.ReadValue<IntPtr>((IntPtr)(script + vars.GDSCRIPT_MEMBER_MAP_OFFSET));
         var lastMemberPtr = game.ReadValue<IntPtr>((IntPtr)(script + vars.GDSCRIPT_MEMBER_MAP_OFFSET + 0x8));
-        int memberSize    = 0x18;
+        int memberSize = 0x18;
 
         while (memberPtr != IntPtr.Zero)
         {
@@ -222,6 +223,7 @@ update
         var xVel = game.ReadValue<float>((IntPtr)(player + vars.CHARACTERBODY3D_VELOCITY_OFFSET));
         var zVel = game.ReadValue<float>((IntPtr)(player + vars.CHARACTERBODY3D_VELOCITY_OFFSET + 0x8));
         current.speed = Math.Sqrt((xVel * xVel) + (zVel * zVel));
+        
         var speedString = current.speed.ToString("0.0") + " m/s";
         vars.SetTextComponent("Speed", speedString);
     }
