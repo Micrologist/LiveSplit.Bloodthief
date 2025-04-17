@@ -70,13 +70,6 @@ init
     vars.OneLevelCompleted = false;
     vars.killsAtCompletion = 0;
     
-    current.igt                 = old.igt                   = -1;
-    current.checkpointNum       = old.checkpointNum         = 0;
-    current.scene               = old.scene                 = "MainScreen";
-    current.levelFinished       = old.levelFinished         = false;
-    current.levelWasRestarted   = old.levelWasRestarted     = false;
-    current.killCount           = old.killCount             = 0;
-
     // todo: properly read stringnames
     vars.ReadStringName = (Func<IntPtr, string>) ((ptr) => {
         var output  = "";
