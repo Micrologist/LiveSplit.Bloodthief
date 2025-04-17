@@ -121,7 +121,6 @@ init
     var gameManagerScript  = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
     var statsServiceScript = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
 
-    var offsets = new Dictionary<string, Dictionary<string, int>>();
     Func<IntPtr, Dictionary<string, int>> GetMemberOffsets = (script) =>
     {
         var result = new Dictionary<string, int>();
@@ -152,24 +151,21 @@ init
         return result;
     };
 
-    offsets["game_manager"]  = GetMemberOffsets(gameManagerScript);
-    offsets["stats_service"] = GetMemberOffsets(statsServiceScript);
+    var gmOffsets = GetMemberOffsets(gameManagerScript);
+    var ssOffsets = GetMemberOffsets(statsServiceScript);
 
-    var gmMembers = offsets["game_manager"];
-    var ssMembers = offsets["stats_service"];
-
-    var gmMembersArray = game.ReadValue<IntPtr>((IntPtr)(gameManager  + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
-    var ssMembersArray = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
+    var gmMembers = game.ReadValue<IntPtr>((IntPtr)(gameManager  + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
+    var ssMembers = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
 
     vars.Watchers = new MemoryWatcherList
     {
         // game_manager
-        new MemoryWatcher<double> (new DeepPointer(gmMembersArray + gmMembers["_total_game_seconds_obfuscated"])) { Name = "total_game_seconds" },
-        new MemoryWatcher<int>    (new DeepPointer(gmMembersArray + gmMembers["current_checkpoint"]))             { Name = "current_checkpoint" },
-        new MemoryWatcher<IntPtr> (new DeepPointer(gmMembersArray + gmMembers["player"] + 0x8))                   { Name = "player" },
+        new MemoryWatcher<double> (new DeepPointer(gmMembers + gmOffsets["_total_game_seconds_obfuscated"])) { Name = "total_game_seconds" },
+        new MemoryWatcher<int>    (new DeepPointer(gmMembers + gmOffsets["current_checkpoint"]))             { Name = "current_checkpoint" },
+        new MemoryWatcher<IntPtr> (new DeepPointer(gmMembers + gmOffsets["player"] + 0x8))                   { Name = "player" },
         // stats_service
-        new MemoryWatcher<IntPtr> (new DeepPointer(ssMembersArray + ssMembers["_enemies_killed"]))                { Name = "enemies_killed_dict" },
-        new MemoryWatcher<IntPtr> (new DeepPointer(ssMembersArray + ssMembers["_locked_in_keys"]))                { Name = "locked_keys_dict" },
+        new MemoryWatcher<IntPtr> (new DeepPointer(ssMembers + ssOffsets["_enemies_killed"]))                { Name = "enemies_killed_dict" },
+        new MemoryWatcher<IntPtr> (new DeepPointer(ssMembers + ssOffsets["_locked_in_keys"]))                { Name = "locked_keys_dict" },
 
         new MemoryWatcher<bool>   (new DeepPointer(endLevelScreen + vars.CANVASLAYER_VISIBLE_OFFSET))             { Name = "level_end_screen_visible" },
         new MemoryWatcher<IntPtr> (new DeepPointer(sceneTree      + vars.SCENETREE_CURRENT_SCENE_OFFSET))         { Name = "current_scene"},
