@@ -20,13 +20,6 @@ startup
             textSetting.GetType().GetProperty("Text2").SetValue(textSetting, text);
 	});
 
-    vars.UpdateSpeedometer = (Action<double>)((speed) =>
-    {
-        var id = "Speed";
-        var text = speed.ToString("0.0") + " m/s";
-        vars.SetTextComponent(id, text);
-    });
-
     if (timer.CurrentTimingMethod == TimingMethod.RealTime)
     {
         DialogResult dbox = MessageBox.Show(timer.Form,
@@ -46,23 +39,43 @@ startup
     settings.Add("aprilComp", true, "Subtract 0.9 seconds for every kill (April Competition)"); 
     settings.Add("enemyCounter", false, "Show enemy kill counter", "aprilComp");
     settings.Add("speedometer", false, "Show speed readout");
+
+    // Godot 4.4 Offsets
+    // SceneTree
+    vars.SCENETREE_ROOT_WINDOW_OFFSET        = 0x03A8; // Window*                           SceneTree::root
+    vars.SCENETREE_CURRENT_SCENE_OFFSET      = 0x0498; // Node*                             SceneTree::current_scene
+
+    // Node / Object
+    vars.OBJECT_SCRIPT_INSTANCE_OFFSET       = 0x0068; // ScriptInstance*                   Object::script_instance
+    vars.NODE_CHILDREN_OFFSET                = 0x01C8; // HashMap<StringName, Node*>        Node::Data::children
+    vars.NODE_NAME_OFFSET                    = 0x0228; // StringName                        Node::Data::name
+
+    // ScriptInstance / GDScript
+    vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET    = 0x0018; // Ref<GDScript>                     GDScriptInstance::script
+    vars.SCRIPTINSTANCE_MEMBERS_OFFSET       = 0x0028; // Vector<Variant>                   GDScriptInstance::members
+    vars.GDSCRIPT_MEMBER_MAP_OFFSET          = 0x0258; // HashMap<StringName, MemberInfo>   GDScript::member_indices
+
+    // CanvasLayer
+    vars.CANVASLAYER_VISIBLE_OFFSET          = 0x0454; // bool                              CanvasLayer::visible
+
+    // CharacterBody3D
+    vars.CHARACTERBODY3D_VELOCITY_OFFSET     = 0x0648; // Vector3                           CharacterBody3D::velocity
 }
 
 init
 {
-    vars.SceneTree = vars.GameManager = vars.StatsService = vars.EndLevelScreen = IntPtr.Zero;
     vars.AccIgt = 0;
     vars.OneLevelCompleted = false;
+    vars.killsAtCompletion = 0;
+    
     current.igt = old.igt = -1;
     current.checkpointNum = old.checkpointNum = 0;
     current.scene = old.scene = "MainScreen";
     current.levelFinished = old.levelFinished = false;
     current.levelWasRestarted = old.levelWasRestarted = false;
     current.killCount = old.killCount = 0;
-    vars.killsAtCompletion = 0;
 
-    //I don't ACTUALLY know how StringNames work, but this seems to do the job
-    //See https://docs.godotengine.org/en/stable/classes/class_stringname.html
+    // todo: properly read stringnames
     vars.ReadStringName = (Func<IntPtr, string>) ((ptr) => {
         var output = "";
         var charPtr = game.ReadValue<IntPtr>((IntPtr)ptr + 0x10);
@@ -76,90 +89,92 @@ init
         return output;
     });
 
-    //Godot 4.4 offsets
-    vars.ROOT_WINDOW_OFFSET = 0x3A8;
-    vars.CHILD_ARRAY_OFFSET = 0x1C8;
-    vars.NODE_NAME_OFFSET = 0x228;
-    vars.CL_VISIBLE_OFFSET = 0x454;
-    vars.CURRENT_SCENE_OFFSET = 0x498;
-    vars.PLAYER_VEL_OFFSET = 0x648;
-
-    //Our "entry" into the hierarchy is Godot's SceneTree object. See https://docs.godotengine.org/en/stable/classes/class_scenetree.html#class-scenetree
-    //We are scanning for a piece of code that accesses the static pointer to the singleton instance of SceneTree
-    //--- bloodthief_v0.01.exe+3F01F8 - 4C 8B 35 F1C3FA02     - mov r14,[bloodthief_v0.01.exe+339C5F0]
-    //"4C 8B 35 ?? ?? ?? ?? 4D 85 F6 74 7E E8 ?? ?? ?? ?? 49 8B CE 48 8B F0 48 8B 10 48 8B BA"
+    // static SceneTree *SceneTree::singleton
     var scn = new SignatureScanner(game, game.MainModule.BaseAddress, game.MainModule.ModuleMemorySize);
     var sceneTreeTrg = new SigScanTarget(3, "4C 8B 35 ?? ?? ?? ?? 4D 85 F6 74 7E") { OnFound = (p, s, ptr) => ptr + 0x4 + game.ReadValue<int>(ptr) };
     var sceneTreePtr = scn.Scan(sceneTreeTrg);
 
-    if(sceneTreePtr == IntPtr.Zero)
-    {
-        throw new Exception("SceneTree not found - trying again!");
-    }
+    // Iterate through the scene root nodes to find the nodes we need
+    var sceneTree       = game.ReadValue<IntPtr>((IntPtr)sceneTreePtr);
+    var rootWindow      = game.ReadValue<IntPtr>((IntPtr)(sceneTree + vars.SCENETREE_ROOT_WINDOW_OFFSET));
+    var childCount      = game.ReadValue<int>((IntPtr)(rootWindow + vars.NODE_CHILDREN_OFFSET));
+    var childArrayPtr   = game.ReadValue<IntPtr>((IntPtr)(rootWindow + vars.NODE_CHILDREN_OFFSET + 0x8));
 
-    //Follow the pointer
-    vars.SceneTree = game.ReadValue<IntPtr>((IntPtr)sceneTreePtr); 
+    var gameManager     = IntPtr.Zero;
+    var statsService    = IntPtr.Zero;
+    var endLevelScreen  = IntPtr.Zero;
 
-    //SceneTree.root
-    var rootWindow = game.ReadValue<IntPtr>((IntPtr)(vars.SceneTree + vars.ROOT_WINDOW_OFFSET));
-
-    //We are starting from the rootwindow node, its children are the scene root nodes
-    var childCount = game.ReadValue<int>((IntPtr)(rootWindow + vars.CHILD_ARRAY_OFFSET));
-    var childArrayPtr = game.ReadValue<IntPtr>((IntPtr)(rootWindow + vars.CHILD_ARRAY_OFFSET + 0x8));
-
-    //Iterating through all scene root nodes to find the GameManager and EndLevelScreen nodes
-    //Caching here only works because the nodes aren't ever destroyed/created at runtime
     for (int i = 0; i < childCount; i++)
     {
         var child = game.ReadValue<IntPtr>(childArrayPtr + (0x8 * i));
         var childName = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(child + vars.NODE_NAME_OFFSET)));
-        if(childName == "GameManager")
-        {
-            vars.GameManager = child;
-        }
-        else if(childName == "EndLevelScreen")
-        {  
-            vars.EndLevelScreen = child;
-        }
-        else if(childName == "StatsService")
-        {
-            vars.StatsService = child;
-        }
+        if(childName == "GameManager")         
+            gameManager = child;
+        else if(childName == "StatsService")   
+            statsService = child;
+        else if(childName == "EndLevelScreen") 
+            endLevelScreen = child;
     }
 
-    if(vars.GameManager == IntPtr.Zero || vars.EndLevelScreen == IntPtr.Zero || vars.StatsService == IntPtr.Zero)
-    {
-        //This should only happen during game boot
+    if(gameManager == IntPtr.Zero || endLevelScreen == IntPtr.Zero || statsService == IntPtr.Zero)
         throw new Exception("GameManager/EndLevelScreen/StatsService not found - trying again!");
-    }
 
-    //This grabs the GDScriptInstance attached to the GameManager Node
-    vars.GameManager = game.ReadValue<IntPtr>((IntPtr)vars.GameManager + 0x68);
-    //Vector<Variant> GDScriptInstance.members
-    var gameManagerMemberArray = game.ReadValue<IntPtr>((IntPtr)vars.GameManager + 0x28);
+    gameManager    = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
+    statsService   = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
 
-    //Same for the StatsService Node
-    vars.StatsService = game.ReadValue<IntPtr>((IntPtr)vars.StatsService + 0x68);
-    var statsServiceMemberArray = game.ReadValue<IntPtr>((IntPtr)vars.StatsService + 0x28);
+    var gameManagerScript  = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
+    var statsServiceScript = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
 
-    //The hardcoded offsets for the members will break if the underlying GDScript is modified in an update
-    //There is a way to programmatically get members by name, but I'm too lazy for now
+    var memberOffsets = new Dictionary<string, Dictionary<string, int>>();
+    Func<IntPtr, Dictionary<string, int>> GetOffsets = (script) =>
+    {
+        var result = new Dictionary<string, int>();
+        var memberPtr     = game.ReadValue<IntPtr>((IntPtr)(script + vars.GDSCRIPT_MEMBER_MAP_OFFSET));
+        var lastMemberPtr = game.ReadValue<IntPtr>((IntPtr)(script + vars.GDSCRIPT_MEMBER_MAP_OFFSET + 0x8));
+        int memberSize    = 0x18;
+
+        while (memberPtr != IntPtr.Zero)
+        {
+            var namePtr = game.ReadValue<IntPtr>((IntPtr)(memberPtr + 0x10));
+            string memberName = vars.ReadStringName(namePtr);
+
+            if (string.IsNullOrEmpty(memberName))
+            {
+                var fallbackNamePtr = game.ReadValue<IntPtr>((IntPtr)(namePtr + 0x8));
+                memberName = game.ReadString(fallbackNamePtr, 255);
+            }
+
+            var index = game.ReadValue<int>((IntPtr)(memberPtr + 0x18));
+            result[memberName] = index * memberSize + 0x8;
+
+            if (memberPtr == lastMemberPtr)
+                break;
+
+            memberPtr = game.ReadValue<IntPtr>((IntPtr)memberPtr);
+        }
+
+        return result;
+    };
+
+    memberOffsets["game_manager"]  = GetOffsets(gameManagerScript);
+    memberOffsets["stats_service"] = GetOffsets(statsServiceScript);
+
+    var gmMembers = memberOffsets["game_manager"];
+    var ssMembers = memberOffsets["stats_service"];
+
+    var gmMembersArray = game.ReadValue<IntPtr>((IntPtr)(gameManager  + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
+    var ssMembersArray = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
+
     vars.Watchers = new MemoryWatcherList
     {
-        //GameManager.total_game_seconds
-        new MemoryWatcher<double>(new DeepPointer(gameManagerMemberArray + 0xE0)) { Name = "total_game_seconds"},
-        //GameManager.current_checkpoint
-        new MemoryWatcher<int>(new DeepPointer(gameManagerMemberArray + 0x260)) { Name = "current_checkpoint"},
-        //GameManager.player
-        new MemoryWatcher<IntPtr>(new DeepPointer(gameManagerMemberArray + 0x28)) { Name = "player"},
+        new MemoryWatcher<double> (new DeepPointer(gmMembersArray + gmMembers["_total_game_seconds_obfuscated"])) { Name = "total_game_seconds" },
+        new MemoryWatcher<int>    (new DeepPointer(gmMembersArray + gmMembers["current_checkpoint"]))             { Name = "current_checkpoint" },
+        new MemoryWatcher<IntPtr> (new DeepPointer(gmMembersArray + gmMembers["player"] + 0x8))                   { Name = "player" },
+        new MemoryWatcher<IntPtr> (new DeepPointer(ssMembersArray + ssMembers["_enemies_killed"]))                { Name = "enemies_killed_dict" },
+        new MemoryWatcher<IntPtr> (new DeepPointer(ssMembersArray + ssMembers["_locked_in_keys"]))                { Name = "locked_keys_dict" },
 
-        //EndLevelScreen.visible (EndLevelScreen is a CanvasLayer Node)
-        new MemoryWatcher<bool>(new DeepPointer(vars.EndLevelScreen + vars.CL_VISIBLE_OFFSET)) { Name = "level_end_screen_visible"},
-
-        //StatsService._enemies_killed
-        new MemoryWatcher<IntPtr>(new DeepPointer(statsServiceMemberArray + 0x38)) { Name = "enemies_killed_dict"},
-        //StatsService._locked_in_keys
-        new MemoryWatcher<IntPtr>(new DeepPointer(statsServiceMemberArray + 0xB0)) { Name = "locked_keys_dict"},
+        new MemoryWatcher<bool>   (new DeepPointer(endLevelScreen + vars.CANVASLAYER_VISIBLE_OFFSET))             { Name = "level_end_screen_visible" },
+        new MemoryWatcher<IntPtr> (new DeepPointer(sceneTree      + vars.SCENETREE_CURRENT_SCENE_OFFSET))         { Name = "current_scene"},
     };
 
     vars.Watchers.UpdateAll(game);
@@ -169,21 +184,20 @@ update
 {
     vars.Watchers.UpdateAll(game);
 
-    current.checkpointNum = vars.Watchers["current_checkpoint"].Current;
-    current.levelFinished = vars.Watchers["level_end_screen_visible"].Current;
+    current.checkpointNum      = vars.Watchers["current_checkpoint"].Current;
+    current.levelFinished      = vars.Watchers["level_end_screen_visible"].Current;
+    current.levelWasRestarted  = vars.Watchers["locked_keys_dict"].Current != vars.Watchers["locked_keys_dict"].Old;
 
-    //The locked_keys_dict gets re-initialized on every level restart
-    current.levelWasRestarted = vars.Watchers["locked_keys_dict"].Current != vars.Watchers["locked_keys_dict"].Old;
-
-    //SceneTree.current_scene
-    var currentSceneNode = game.ReadValue<IntPtr>((IntPtr)(vars.SceneTree + vars.CURRENT_SCENE_OFFSET));
+    var currentSceneNode = vars.Watchers["current_scene"].Current;
     var newScene = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(currentSceneNode + vars.NODE_NAME_OFFSET)));
     current.scene = String.IsNullOrEmpty(newScene) ? old.scene : newScene;
+
     current.inMainMenu = current.scene == "MainScreen";
 
     current.igt = current.inMainMenu ? 0f : ((vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3);
     current.igt = Math.Floor(current.igt * 1000) / 1000;
 
+    // Once a level is completed, auto-reset is disabled and IGT is accumulated
     if(current.levelFinished && !vars.OneLevelCompleted)
     {
         vars.OneLevelCompleted = true;
@@ -205,14 +219,16 @@ update
     if(settings["speedometer"])
     {
         var player = (IntPtr)vars.Watchers["player"].Current;
-        var xVel = game.ReadValue<float>((IntPtr)(player + vars.PLAYER_VEL_OFFSET));
-        var zVel = game.ReadValue<float>((IntPtr)(player + vars.PLAYER_VEL_OFFSET + 0x8));
+        var xVel = game.ReadValue<float>((IntPtr)(player + vars.CHARACTERBODY3D_VELOCITY_OFFSET));
+        var zVel = game.ReadValue<float>((IntPtr)(player + vars.CHARACTERBODY3D_VELOCITY_OFFSET + 0x8));
         current.speed = Math.Sqrt((xVel * xVel) + (zVel * zVel));
-        vars.UpdateSpeedometer(current.speed);
+        var speedString = current.speed.ToString("0.0") + " m/s";
+        vars.SetTextComponent("Speed", speedString);
     }
 
     if(settings["aprilComp"])
     {
+        // I think this is a HashMap<Variant, Variant, VariantHasher, StringLikeVariantComparator> variant_map
         var killedEnemiesDict = (IntPtr)vars.Watchers["enemies_killed_dict"].Current;
         var totalCount = game.ReadValue<int>(killedEnemiesDict + 0x3C);
         var killCount = 0;
@@ -237,6 +253,7 @@ update
         }
     }
 }
+
 
 isLoading
 {
