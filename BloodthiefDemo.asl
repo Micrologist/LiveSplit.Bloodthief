@@ -116,8 +116,8 @@ init
             endLevelScreen = child;
     }
 
-    if(gameManager == IntPtr.Zero || endLevelScreen == IntPtr.Zero || statsService == IntPtr.Zero)
-        throw new Exception("GameManager/EndLevelScreen/StatsService not found - trying again!");
+    if(sceneTree == IntPtr.Zero || gameManager == IntPtr.Zero || endLevelScreen == IntPtr.Zero || statsService == IntPtr.Zero)
+        throw new Exception("SceneTree/GameManager/EndLevelScreen/StatsService not found - trying again!");
 
     gameManager    = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
     statsService   = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
