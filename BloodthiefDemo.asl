@@ -121,8 +121,8 @@ init
     var gameManagerScript  = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
     var statsServiceScript = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
 
-    var memberOffsets = new Dictionary<string, Dictionary<string, int>>();
-    Func<IntPtr, Dictionary<string, int>> GetOffsets = (script) =>
+    var offsets = new Dictionary<string, Dictionary<string, int>>();
+    Func<IntPtr, Dictionary<string, int>> GetMemberOffsets = (script) =>
     {
         var result = new Dictionary<string, int>();
         var memberPtr     = game.ReadValue<IntPtr>((IntPtr)(script + vars.GDSCRIPT_MEMBER_MAP_OFFSET));
@@ -152,11 +152,11 @@ init
         return result;
     };
 
-    memberOffsets["game_manager"]  = GetOffsets(gameManagerScript);
-    memberOffsets["stats_service"] = GetOffsets(statsServiceScript);
+    offsets["game_manager"]  = GetMemberOffsets(gameManagerScript);
+    offsets["stats_service"] = GetMemberOffsets(statsServiceScript);
 
-    var gmMembers = memberOffsets["game_manager"];
-    var ssMembers = memberOffsets["stats_service"];
+    var gmMembers = offsets["game_manager"];
+    var ssMembers = offsets["stats_service"];
 
     var gmMembersArray = game.ReadValue<IntPtr>((IntPtr)(gameManager  + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
     var ssMembersArray = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
