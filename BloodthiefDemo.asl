@@ -168,11 +168,11 @@ init
 
     vars.Watchers = new MemoryWatcherList
     {
-        //game_manager
+        // game_manager
         new MemoryWatcher<double> (new DeepPointer(gmMembersArray + gmMembers["_total_game_seconds_obfuscated"])) { Name = "total_game_seconds" },
         new MemoryWatcher<int>    (new DeepPointer(gmMembersArray + gmMembers["current_checkpoint"]))             { Name = "current_checkpoint" },
         new MemoryWatcher<IntPtr> (new DeepPointer(gmMembersArray + gmMembers["player"] + 0x8))                   { Name = "player" },
-        //stats_service
+        // stats_service
         new MemoryWatcher<IntPtr> (new DeepPointer(ssMembersArray + ssMembers["_enemies_killed"]))                { Name = "enemies_killed_dict" },
         new MemoryWatcher<IntPtr> (new DeepPointer(ssMembersArray + ssMembers["_locked_in_keys"]))                { Name = "locked_keys_dict" },
 
