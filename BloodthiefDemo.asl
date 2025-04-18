@@ -42,26 +42,26 @@ startup
 
     // Godot 4.4 Offsets
     // SceneTree
-    vars.SCENETREE_ROOT_WINDOW_OFFSET        = 0x03A8; // Window*                           SceneTree::root
-    vars.SCENETREE_CURRENT_SCENE_OFFSET      = 0x0498; // Node*                             SceneTree::current_scene
+    vars.SCENETREE_ROOT_WINDOW_OFFSET        = 0x3A8; // Window*                           SceneTree::root
+    vars.SCENETREE_CURRENT_SCENE_OFFSET      = 0x498; // Node*                             SceneTree::current_scene
 
     // Node / Object
-    vars.OBJECT_SCRIPT_INSTANCE_OFFSET       = 0x0068; // ScriptInstance*                   Object::script_instance
-    vars.NODE_CHILDREN_OFFSET                = 0x01C8; // HashMap<StringName, Node*>        Node::Data::children
-    vars.NODE_NAME_OFFSET                    = 0x0228; // StringName                        Node::Data::name
+    vars.OBJECT_SCRIPT_INSTANCE_OFFSET       = 0x068; // ScriptInstance*                   Object::script_instance
+    vars.NODE_CHILDREN_OFFSET                = 0x1C8; // HashMap<StringName, Node*>        Node::Data::children
+    vars.NODE_NAME_OFFSET                    = 0x228; // StringName                        Node::Data::name
 
     // GDScriptInstance
-    vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET    = 0x0018; // Ref<GDScript>                     GDScriptInstance::script
-    vars.SCRIPTINSTANCE_MEMBERS_OFFSET       = 0x0028; // Vector<Variant>                   GDScriptInstance::members
+    vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET    = 0x018; // Ref<GDScript>                     GDScriptInstance::script
+    vars.SCRIPTINSTANCE_MEMBERS_OFFSET       = 0x028; // Vector<Variant>                   GDScriptInstance::members
 
     // GDScript
-    vars.GDSCRIPT_MEMBER_MAP_OFFSET          = 0x0258; // HashMap<StringName, MemberInfo>   GDScript::member_indices
+    vars.GDSCRIPT_MEMBER_MAP_OFFSET          = 0x258; // HashMap<StringName, MemberInfo>   GDScript::member_indices
 
     // CanvasLayer
-    vars.CANVASLAYER_VISIBLE_OFFSET          = 0x0454; // bool                              CanvasLayer::visible
+    vars.CANVASLAYER_VISIBLE_OFFSET          = 0x454; // bool                              CanvasLayer::visible
 
     // CharacterBody3D
-    vars.CHARACTERBODY3D_VELOCITY_OFFSET     = 0x0648; // Vector3                           CharacterBody3D::velocity
+    vars.CHARACTERBODY3D_VELOCITY_OFFSET     = 0x648; // Vector3                           CharacterBody3D::velocity
 }
 
 init
