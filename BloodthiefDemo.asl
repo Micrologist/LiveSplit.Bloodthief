@@ -84,14 +84,18 @@ init
         return output;
     });
 
-    vars.ReadUtf32String = (Func<IntPtr, string>) ((ptr) => {
-        var output = "";
-        while(game.ReadValue<int>(ptr) != 0)
+    vars.ReadUtf32String = (Func<IntPtr, string>)((ptr) =>
+    {
+        var sb = new StringBuilder();
+        int utf32char;
+
+        while ((utf32char = game.ReadValue<int>(ptr)) != 0)
         {
-            output  += game.ReadValue<char>(ptr);
-            ptr += 0x4;
+            sb.Append(char.ConvertFromUtf32(utf32char));
+            ptr += 4;
         }
-        return output;
+
+        return sb.ToString();
     });
 
     // static SceneTree *SceneTree::singleton
