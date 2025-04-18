@@ -112,14 +112,8 @@ init
             endLevelScreen = child;
     }
 
-    if(sceneTree == IntPtr.Zero || gameManager == IntPtr.Zero || endLevelScreen == IntPtr.Zero || statsService == IntPtr.Zero)
+    if(gameManager == IntPtr.Zero || endLevelScreen == IntPtr.Zero || statsService == IntPtr.Zero)
         throw new Exception("SceneTree/GameManager/EndLevelScreen/StatsService not found - trying again!");
-
-    gameManager  = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
-    statsService = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
-
-    var gameManagerScript  = game.ReadValue<IntPtr>((IntPtr)(gameManager + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
-    var statsServiceScript = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET));
 
     Func<IntPtr, Dictionary<string, int>> GetMemberOffsets = (script) =>
     {
@@ -151,8 +145,13 @@ init
         return result;
     };
 
-    var gmOffsets = GetMemberOffsets(gameManagerScript);
-    var ssOffsets = GetMemberOffsets(statsServiceScript);
+    // Get the ScriptInstance from the Node
+    gameManager  = game.ReadValue<IntPtr>((IntPtr)(gameManager  + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
+    statsService = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.OBJECT_SCRIPT_INSTANCE_OFFSET));
+
+    // Dump the offsets from the GDScript
+    var gmOffsets = GetMemberOffsets(game.ReadValue<IntPtr>((IntPtr)(gameManager  + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET)));
+    var ssOffsets = GetMemberOffsets(game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_SCRIPT_REF_OFFSET)));
 
     var gmMembers = game.ReadValue<IntPtr>((IntPtr)(gameManager  + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
     var ssMembers = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
@@ -167,8 +166,8 @@ init
         new MemoryWatcher<IntPtr> (new DeepPointer(ssMembers + ssOffsets["_enemies_killed"]))                { Name = "enemies_killed_dict" },
         new MemoryWatcher<IntPtr> (new DeepPointer(ssMembers + ssOffsets["_locked_in_keys"]))                { Name = "locked_keys_dict" },
 
-        new MemoryWatcher<bool>   (new DeepPointer(endLevelScreen + vars.CANVASLAYER_VISIBLE_OFFSET))             { Name = "level_end_screen_visible" },
-        new MemoryWatcher<IntPtr> (new DeepPointer(sceneTree      + vars.SCENETREE_CURRENT_SCENE_OFFSET))         { Name = "current_scene"},
+        new MemoryWatcher<bool>   (new DeepPointer(endLevelScreen + vars.CANVASLAYER_VISIBLE_OFFSET))        { Name = "level_end_screen_visible" },
+        new MemoryWatcher<IntPtr> (new DeepPointer(sceneTree      + vars.SCENETREE_CURRENT_SCENE_OFFSET))    { Name = "current_scene"},
     };
 
     vars.UpdateState = (Action)(()=> 
