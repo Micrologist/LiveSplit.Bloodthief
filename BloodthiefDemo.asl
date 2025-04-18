@@ -33,12 +33,12 @@ startup
         }
     }
 
-    settings.Add("endlevelSplit",   true,  "Split when finishing a level");
-    settings.Add("checkpointSplit", false, "Split when reaching a checkpoint");
-    settings.Add("ilMode",          false, "Always reset when restarting level (IL Mode)");
-    settings.Add("aprilComp",       true,  "Subtract 0.9 seconds for every kill (April Competition)"); 
-    settings.Add("enemyCounter",    false, "Show enemy kill counter", "aprilComp");
-    settings.Add("speedometer",     false, "Show speed readout");
+    settings.Add("endlevelSplit",    true,  "Split when finishing a level");
+    settings.Add("checkpointSplit",  false, "Split when reaching a checkpoint");
+    settings.Add("ilMode",           false, "Always reset when restarting level (IL Mode)");
+    settings.Add("aprilCompetition", true,  "Subtract 0.9 seconds for every kill (April Competition)"); 
+    settings.Add("enemyCounter",     false, "Show enemy kill counter", "aprilCompetition");
+    settings.Add("speedometer",      false, "Show speed");
 
     // Godot 4.4 Offsets
     // SceneTree
@@ -62,6 +62,10 @@ startup
 
     // CharacterBody3D
     vars.CHARACTERBODY3D_VELOCITY_OFFSET     = 0x648; // Vector3                           CharacterBody3D::velocity
+
+
+    // April Speedrun Competition
+    vars.MS_PER_KILL = 900;
 }
 
 init
@@ -170,35 +174,44 @@ init
     var gmMembers = game.ReadValue<IntPtr>((IntPtr)(gameManager  + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
     var ssMembers = game.ReadValue<IntPtr>((IntPtr)(statsService + vars.SCRIPTINSTANCE_MEMBERS_OFFSET));
 
-    vars.Watchers = new MemoryWatcherList
-    {
-        // game_manager
-        new MemoryWatcher<double> (new DeepPointer(gmMembers + gmOffsets["_total_game_seconds_obfuscated"])) { Name = "total_game_seconds" },
-        new MemoryWatcher<int>    (new DeepPointer(gmMembers + gmOffsets["current_checkpoint"]))             { Name = "current_checkpoint" },
-        new MemoryWatcher<IntPtr> (new DeepPointer(gmMembers + gmOffsets["player"] + 0x8))                   { Name = "player" },
-        // stats_service
-        new MemoryWatcher<IntPtr> (new DeepPointer(ssMembers + ssOffsets["_enemies_killed"]))                { Name = "enemies_killed_dict" },
-        new MemoryWatcher<IntPtr> (new DeepPointer(ssMembers + ssOffsets["_locked_in_keys"]))                { Name = "locked_keys_dict" },
-
-        new MemoryWatcher<bool>   (new DeepPointer(endLevelScreen + vars.CANVASLAYER_VISIBLE_OFFSET))        { Name = "level_end_screen_visible" },
-        new MemoryWatcher<IntPtr> (new DeepPointer(sceneTree      + vars.SCENETREE_CURRENT_SCENE_OFFSET))    { Name = "current_scene"},
-    };
-
     vars.UpdateState = (Action)(()=> 
     {
-        vars.Watchers.UpdateAll(game);
-        current.checkpointNum = vars.Watchers["current_checkpoint"].Current;
-        current.levelFinished = vars.Watchers["level_end_screen_visible"].Current;
-        current.levelWasRestarted = vars.Watchers["locked_keys_dict"].Current != vars.Watchers["locked_keys_dict"].Old;
-
-        var currentSceneNode = vars.Watchers["current_scene"].Current;
-        var newScene = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(currentSceneNode + vars.NODE_NAME_OFFSET)));
-        current.scene = String.IsNullOrEmpty(newScene) ? old.scene : newScene;
-
+        var sceneNode = game.ReadValue<IntPtr>((IntPtr)(sceneTree + vars.SCENETREE_CURRENT_SCENE_OFFSET));
+        var sceneName = game.ReadValue<IntPtr>((IntPtr)(sceneNode + vars.NODE_NAME_OFFSET));
+        var newScene = vars.ReadStringName(sceneName);
+        current.scene = !String.IsNullOrEmpty(newScene) ? newScene : current.scene;
         current.inMainMenu = current.scene == "MainScreen";
 
-        current.igt = current.inMainMenu ? 0f : ((vars.Watchers["total_game_seconds"].Current - 7.2) / 13.3);
-        current.igt = Math.Floor(current.igt * 1000) / 1000;
+        current.levelFinished = game.ReadValue<bool>((IntPtr)(endLevelScreen + vars.CANVASLAYER_VISIBLE_OFFSET));
+
+        var obfuscatedIgt = game.ReadValue<double>(gmMembers + gmOffsets["_total_game_seconds_obfuscated"]);
+        var doubleIgt = (obfuscatedIgt - 7.2) / 13.3;
+        current.igt = !current.inMainMenu ? Math.Round((double)doubleIgt * 1000) : 0;
+        
+        current.checkpointNum = game.ReadValue<int>   (gmMembers + gmOffsets["current_checkpoint"]);
+        // Variants of type OBJECT have their data pointer 0x8 bytes further
+        current.playerPtr     = game.ReadValue<IntPtr>(gmMembers + gmOffsets["player"] + 0x8);
+
+        current.enemiesKilledDict = game.ReadValue<IntPtr>(ssMembers + ssOffsets["_enemies_killed"]);
+        current.lockedKeysDict =    game.ReadValue<IntPtr>(ssMembers + ssOffsets["_locked_in_keys"]);
+        
+    });
+
+    vars.UpdateKillCount = (Action)(() => 
+    {
+        IntPtr enemyDict = current.enemiesKilledDict;
+        current.enemyCount = game.ReadValue<int>(enemyDict + 0x3C);
+        var killCount = 0;
+
+        var entry = game.ReadValue<IntPtr>(enemyDict + 0x28);
+        for (int i = 0; i < current.enemyCount; i++)
+        {
+            if(game.ReadValue<bool>(entry+0x30))
+                killCount++;
+            entry = game.ReadValue<IntPtr>(entry);
+        }
+
+        current.killCount = killCount;
     });
 
     vars.UpdateState();
@@ -208,6 +221,9 @@ update
 {
     vars.UpdateState();
 
+    // This dictionary gets reinitialized when a map is (re-)loaded
+    current.levelWasRestarted = current.lockedKeysDict != old.lockedKeysDict;
+
     // Once a level is completed, auto-reset is disabled and IGT is accumulated
     if(current.levelFinished && !vars.OneLevelCompleted)
     {
@@ -216,20 +232,21 @@ update
 
     if(vars.OneLevelCompleted && current.igt < old.igt && old.scene != "MainScreen")
     {
-        var offset = old.igt;
-        if(settings["aprilComp"])
+        var acc = old.igt;
+
+        if(settings["aprilCompetition"])
         {
-            offset += vars.killsAtCompletion * (-0.9f);
+            acc -= vars.killsAtCompletion * vars.MS_PER_KILL;
             vars.killsAtCompletion = 0;
         }
 
-        vars.AccIgt += offset;
-        vars.Log("Accumulated "+offset.ToString("0.00")+" seconds of igt on "+old.scene);
+        vars.AccIgt += acc;
+        vars.Log("Accumulated "+acc.ToString("0.00")+" seconds of igt on "+old.scene);
     }
 
     if(settings["speedometer"])
     {
-        var player = (IntPtr)vars.Watchers["player"].Current;
+        var player = current.playerPtr;
         var xVel = game.ReadValue<float>((IntPtr)(player + vars.CHARACTERBODY3D_VELOCITY_OFFSET));
         var zVel = game.ReadValue<float>((IntPtr)(player + vars.CHARACTERBODY3D_VELOCITY_OFFSET + 0x8));
         current.speed = Math.Sqrt((xVel * xVel) + (zVel * zVel));
@@ -238,31 +255,18 @@ update
         vars.SetTextComponent("Speed", speedString);
     }
 
-    if(settings["aprilComp"])
+    if(settings["aprilCompetition"])
     {
-        // I think this is a HashMap<Variant, Variant, VariantHasher, StringLikeVariantComparator> variant_map
-        var killedEnemiesDict = (IntPtr)vars.Watchers["enemies_killed_dict"].Current;
-        var totalCount = game.ReadValue<int>(killedEnemiesDict + 0x3C);
-        var killCount = 0;
-
-        var entry = game.ReadValue<IntPtr>(killedEnemiesDict + 0x28);
-        for (int i = 0; i < totalCount; i++)
-        {
-            if(game.ReadValue<bool>(entry+0x30))
-                killCount++;
-            entry = game.ReadValue<IntPtr>(entry);
-        }
-
-        current.killCount = killCount;
-
-        if(settings["enemyCounter"])
-        {
-            vars.SetTextComponent("Enemies killed", killCount + "/" + totalCount);
-        }
+        vars.UpdateKillCount();
 
         if(current.levelFinished && !old.levelFinished)
         {
-            vars.killsAtCompletion = killCount;
+            vars.killsAtCompletion = current.killCount;
+        }
+
+        if(settings["enemyCounter"])
+        {
+            vars.SetTextComponent("Enemies killed", current.killCount + "/" + current.enemyCount);
         }
     }
 }
@@ -274,14 +278,14 @@ isLoading
 
 gameTime
 {
-    if(settings["aprilComp"])
+    var gameTime = vars.AccIgt + current.igt;
+
+    if(settings["aprilCompetition"])
     {
-        return TimeSpan.FromSeconds(vars.AccIgt + current.igt + (current.killCount * -0.9f));
+        gameTime -= current.killCount * vars.MS_PER_KILL;
     }
-    else
-    {
-        return TimeSpan.FromSeconds(vars.AccIgt + current.igt);
-    }
+
+    return TimeSpan.FromSeconds(gameTime / 1000);
 }
 
 split
@@ -292,7 +296,7 @@ split
 
 start
 {
-    return (current.igt > old.igt && old.igt <= 0.1)
+    return (current.igt > old.igt && old.igt <= 50)
         && !current.inMainMenu;
 }
 
