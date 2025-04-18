@@ -102,14 +102,20 @@ init
     for (int i = 0; i < childCount; i++)
     {
         var child = game.ReadValue<IntPtr>(childArrayPtr + (0x8 * i));
-        var childName = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(child + vars.NODE_NAME_OFFSET)));
+        var childName = (String)vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(child + vars.NODE_NAME_OFFSET)));
 
-        if(childName == "GameManager")         
-            gameManager = child;
-        else if(childName == "StatsService")   
-            statsService = child;
-        else if(childName == "EndLevelScreen") 
-            endLevelScreen = child;
+        switch (childName)
+        {
+            case "GameManager":
+                gameManager = child;
+                break;
+            case "StatsService":
+                statsService = child;
+                break;
+            case "EndLevelScreen":
+                endLevelScreen = child;
+                break;
+        }
     }
 
     if(gameManager == IntPtr.Zero || endLevelScreen == IntPtr.Zero || statsService == IntPtr.Zero)
