@@ -102,9 +102,9 @@ init
     for (int i = 0; i < childCount; i++)
     {
         var child = game.ReadValue<IntPtr>(childArrayPtr + (0x8 * i));
-        var childName = (String)vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(child + vars.NODE_NAME_OFFSET)));
+        var childName = vars.ReadStringName(game.ReadValue<IntPtr>((IntPtr)(child + vars.NODE_NAME_OFFSET)));
 
-        switch (childName)
+        switch ((String)childName)
         {
             case "GameManager":
                 gameManager = child;
