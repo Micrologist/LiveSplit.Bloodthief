@@ -70,17 +70,27 @@ init
     vars.OneLevelCompleted = false;
     vars.killsAtCompletion = 0;
     
-    // todo: properly read stringnames
+    // StringNames contain either a Godot String object (Utf32) or a C-string pointer
     vars.ReadStringName = (Func<IntPtr, string>) ((ptr) => {
-        var output  = "";
-        var charPtr = game.ReadValue<IntPtr>((IntPtr)ptr + 0x10);
-        
-        while(game.ReadValue<int>((IntPtr)charPtr) != 0)
+        var stringPtr = game.ReadValue<IntPtr>(ptr + 0x10);
+        var output = vars.ReadUtf32String(stringPtr);
+
+        if(String.IsNullOrEmpty(output))
         {
-            output  += game.ReadValue<char>(charPtr);
-            charPtr += 0x4;
+            // Read C-String instead
+            stringPtr = game.ReadValue<IntPtr>(ptr + 0x8);
+            output = game.ReadString(stringPtr, 255);
         }
-        
+        return output;
+    });
+
+    vars.ReadUtf32String = (Func<IntPtr, string>) ((ptr) => {
+        var output = "";
+        while(game.ReadValue<int>(ptr) != 0)
+        {
+            output  += game.ReadValue<char>(ptr);
+            ptr += 0x4;
+        }
         return output;
     });
 
@@ -130,22 +140,16 @@ init
 
         while (memberPtr != IntPtr.Zero)
         {
-            var namePtr = game.ReadValue<IntPtr>((IntPtr)(memberPtr + 0x10));
+            var namePtr = game.ReadValue<IntPtr>(memberPtr + 0x10);
             string memberName = vars.ReadStringName(namePtr);
 
-            if (string.IsNullOrEmpty(memberName))
-            {
-                var fallbackNamePtr = game.ReadValue<IntPtr>((IntPtr)(namePtr + 0x8));
-                memberName = game.ReadString(fallbackNamePtr, 255);
-            }
-
-            var index = game.ReadValue<int>((IntPtr)(memberPtr + 0x18));
+            var index = game.ReadValue<int>(memberPtr + 0x18);
             result[memberName] = index * memberSize + 0x8;
 
             if (memberPtr == lastMemberPtr)
                 break;
 
-            memberPtr = game.ReadValue<IntPtr>((IntPtr)memberPtr);
+            memberPtr = game.ReadValue<IntPtr>(memberPtr);
         }
 
         return result;
@@ -236,6 +240,7 @@ update
         var killedEnemiesDict = (IntPtr)vars.Watchers["enemies_killed_dict"].Current;
         var totalCount = game.ReadValue<int>(killedEnemiesDict + 0x3C);
         var killCount = 0;
+
         var entry = game.ReadValue<IntPtr>(killedEnemiesDict + 0x28);
         for (int i = 0; i < totalCount; i++)
         {
