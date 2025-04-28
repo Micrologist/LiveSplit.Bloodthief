@@ -36,8 +36,7 @@ startup
     settings.Add("endlevelSplit",    true,  "Split when finishing a level");
     settings.Add("checkpointSplit",  false, "Split when reaching a checkpoint");
     settings.Add("ilMode",           false, "Always reset when restarting level (IL Mode)");
-    settings.Add("aprilCompetition", true,  "Subtract 0.9 seconds for every kill (April Competition)"); 
-    settings.Add("enemyCounter",     false, "Show enemy kill counter", "aprilCompetition");
+    settings.Add("enemyCounter",     false, "Show enemy kill counter");
     settings.Add("speedometer",      false, "Show speed");
 
     // Godot 4.4 Offsets
@@ -62,17 +61,12 @@ startup
 
     // CharacterBody3D
     vars.CHARACTERBODY3D_VELOCITY_OFFSET     = 0x648; // Vector3                           CharacterBody3D::velocity
-
-
-    // April Speedrun Competition
-    vars.MS_PER_KILL = 900;
 }
 
 init
 {
     vars.AccIgt = 0;
     vars.OneLevelCompleted = false;
-    vars.killsAtCompletion = 0;
     
     // StringNames contain either a Godot String object (Utf32) or a C-string pointer
     vars.ReadStringName = (Func<IntPtr, string>) ((ptr) => {
@@ -190,10 +184,10 @@ init
         
         current.checkpointNum = game.ReadValue<int>   (gmMembers + gmOffsets["current_checkpoint"]);
         // Variants of type OBJECT have their data pointer 0x8 bytes further
-        current.playerPtr     = game.ReadValue<IntPtr>(gmMembers + gmOffsets["player"] + 0x8);
+        current.playerPtr = game.ReadValue<IntPtr>(gmMembers + gmOffsets["player"] + 0x8);
 
         current.enemiesKilledDict = game.ReadValue<IntPtr>(ssMembers + ssOffsets["_enemies_killed"]);
-        current.lockedKeysDict =    game.ReadValue<IntPtr>(ssMembers + ssOffsets["_locked_in_keys"]);
+        current.lockedKeysDict    = game.ReadValue<IntPtr>(ssMembers + ssOffsets["_locked_in_keys"]);
         
     });
 
@@ -232,16 +226,8 @@ update
 
     if(vars.OneLevelCompleted && current.igt < old.igt && old.scene != "MainScreen")
     {
-        var acc = old.igt;
-
-        if(settings["aprilCompetition"])
-        {
-            acc -= vars.killsAtCompletion * vars.MS_PER_KILL;
-            vars.killsAtCompletion = 0;
-        }
-
-        vars.AccIgt += acc;
-        vars.Log("Accumulated "+acc.ToString("0.00")+" seconds of igt on "+old.scene);
+        vars.AccIgt += old.igt;
+        vars.Log("Accumulated "+old.igt.ToString()+" ms of igt on "+old.scene);
     }
 
     if(settings["speedometer"])
@@ -255,19 +241,10 @@ update
         vars.SetTextComponent("Speed", speedString);
     }
 
-    if(settings["aprilCompetition"])
+    if(settings["enemyCounter"])
     {
         vars.UpdateKillCount();
-
-        if(current.levelFinished && !old.levelFinished)
-        {
-            vars.killsAtCompletion = current.killCount;
-        }
-
-        if(settings["enemyCounter"])
-        {
-            vars.SetTextComponent("Enemies killed", current.killCount + "/" + current.enemyCount);
-        }
+        vars.SetTextComponent("Enemies killed", current.killCount + "/" + current.enemyCount);
     }
 }
 
@@ -279,12 +256,6 @@ isLoading
 gameTime
 {
     var gameTime = vars.AccIgt + current.igt;
-
-    if(settings["aprilCompetition"])
-    {
-        gameTime -= current.killCount * vars.MS_PER_KILL;
-    }
-
     return TimeSpan.FromSeconds(gameTime / 1000);
 }
 
@@ -304,7 +275,6 @@ onStart
 {
     vars.AccIgt = 0f;
     vars.OneLevelCompleted = false;
-    vars.killsAtCompletion = 0;
 }
 
 reset
